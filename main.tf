@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "aws" {
-  region     = var.region
+  region = var.region
 }
 
 resource "aws_ecr_repository" "my_repo" {
@@ -123,7 +123,6 @@ resource "null_resource" "docker_setup" {
       "sudo systemctl enable docker.service",
       "sudo apt-get install -y docker-compose",
       "sudo apt-get install awscli -y",
-      "sudo aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 301581196284.dkr.ecr.us-east-1.amazonaws.com",
       "sudo mkdir nginx",
     ]
   }
@@ -135,12 +134,13 @@ resource "null_resource" "docker_setup" {
     content     = file("nginx/nginx.conf")
     destination = "/home/ubuntu/nginx.conf"
   }
-    provisioner "remote-exec" {
+  provisioner "remote-exec" {
     inline = [
       "sudo mv nginx.conf nginx/nginx.conf",
+      "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 301581196284.dkr.ecr.us-east-1.amazonaws.com",
       "docker compose up -d"
     ]
-    }
+  }
   depends_on = [aws_instance.frontend]
 
   connection {
