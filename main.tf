@@ -1,22 +1,19 @@
-locals {
-  ssh_user         = "ubuntu"
-  key_name         = "public"
-  private_key_path = "public.pem"
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
 }
 
 provider "aws" {
   region     = var.region
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
 }
 
 resource "aws_ecr_repository" "my_repo" {
-  name                 = "my-docker-repo"
+  name                 = var.repository_name
   image_tag_mutability = "MUTABLE"
-}
-
-output "ecr_url" {
-  value = aws_ecr_repository.my_repo.repository_url
 }
 
 # Create an IAM role
@@ -80,16 +77,16 @@ resource "aws_iam_instance_profile" "ec2-profile" {
   role = aws_iam_role.ecr.name
 }
 
-resource "aws_instance" "my_ec2_instance" {
+resource "aws_instance" "frontend" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.for_public_ec2.id]
+  vpc_security_group_ids      = [aws_security_group.for_frontend.id]
   iam_instance_profile        = aws_iam_instance_profile.ec2-profile.name
-  key_name                    = local.key_name
+  key_name                    = var.key_name
 }
 
-resource "aws_security_group" "for_public_ec2" {
+resource "aws_security_group" "for_frontend" {
   name        = "allow_web_traffic"
   description = "Allow Web inbound traffic"
 
@@ -135,28 +132,22 @@ resource "null_resource" "docker_setup" {
     destination = "/home/ubuntu/docker-compose.yml"
   }
   provisioner "file" {
-    content     = file("nginx/Dockerfile")
-    destination = "/home/ubuntu/Dockerfile"
-  }
-  provisioner "file" {
     content     = file("nginx/nginx.conf")
     destination = "/home/ubuntu/nginx.conf"
   }
-
     provisioner "remote-exec" {
     inline = [
-      "sudo mv Dockerfile nginx/Dockerfile",
       "sudo mv nginx.conf nginx/nginx.conf",
       "docker compose up -d"
     ]
     }
-  depends_on = [aws_instance.my_ec2_instance]
+  depends_on = [aws_instance.frontend]
 
   connection {
     type        = "ssh"
     user        = "ubuntu"
-    private_key = file("public.pem")
-    host        = aws_instance.my_ec2_instance.public_ip
+    private_key = file(var.private_key_path)
+    host        = aws_instance.frontend.public_ip
   }
 }
 

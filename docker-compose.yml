@@ -11,6 +11,9 @@ services:
     ports:
       - "5432:5432"
   web:
+#for local
+#    build: .
+#for aws
     image: 301581196284.dkr.ecr.us-east-1.amazonaws.com/my-docker-repo:latest
     command: >
             sh -c "python manage.py collectstatic --noinput &&
